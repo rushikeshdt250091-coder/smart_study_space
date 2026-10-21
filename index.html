@@ -1,0 +1,586 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Smart Study Space | Library Space Intelligence</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <style>
+    @keyframes scanline {
+      0% { top: 0%; opacity: 0.8; }
+      50% { top: 85%; opacity: 1; }
+      100% { top: 0%; opacity: 0.8; }
+    }
+    .scanner-line {
+      animation: scanline 2.2s infinite ease-in-out;
+    }
+  </style>
+</head>
+<body class="bg-slate-900 text-slate-100 min-h-screen font-sans antialiased flex flex-col">
+
+  <!-- Header & Navigation -->
+  <header class="border-b border-slate-800 bg-slate-950/80 backdrop-blur sticky top-0 z-40">
+    <div class="max-w-7xl mx-auto px-4 py-3 flex flex-wrap justify-between items-center gap-4">
+      <div class="flex items-center space-x-3">
+        <div class="w-10 h-10 rounded-xl bg-blue-600 flex items-center justify-center text-white font-bold shadow-lg shadow-blue-500/20">
+          <i class="fa-solid fa-graduation-cap text-lg"></i>
+        </div>
+        <div>
+          <h1 class="font-bold text-lg leading-tight tracking-wide text-white">Smart Study Space</h1>
+          <p class="text-xs text-slate-400">Real-Time Space Intelligence • I²IT Library</p>
+        </div>
+      </div>
+
+      <!-- Quick Session Indicator & Mode Toggle -->
+      <div class="flex items-center space-x-3">
+        <div id="active-session-pill" class="hidden px-3 py-1.5 rounded-full text-xs font-semibold bg-amber-500/20 border border-amber-500/40 text-amber-300 flex items-center space-x-2">
+          <span class="relative flex h-2 w-2">
+            <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
+            <span class="relative inline-flex rounded-full h-2 w-2 bg-amber-500"></span>
+          </span>
+          <span id="session-pill-label">Grace Period Active: 14:59</span>
+        </div>
+
+        <button onclick="toggleAdminView()" id="role-toggle-btn" class="px-3 py-1.5 rounded-lg border border-slate-700 bg-slate-800/80 hover:bg-slate-700 text-xs font-medium text-slate-300 transition flex items-center space-x-2">
+          <i class="fa-solid fa-chart-pie text-blue-400"></i>
+          <span id="role-text">Staff Analytics</span>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- Main Content Layout -->
+  <main class="max-w-7xl mx-auto px-4 py-6 flex-1 w-full space-y-6">
+
+    <!-- Hero / Metrics Overview -->
+    <section class="grid grid-cols-2 md:grid-cols-4 gap-4">
+      <div class="p-4 rounded-xl bg-slate-800/60 border border-slate-700/60 shadow-sm flex items-center justify-between">
+        <div>
+          <p class="text-xs text-slate-400 uppercase font-medium">Available Seats</p>
+          <h3 id="stat-available" class="text-2xl font-bold text-emerald-400 mt-1">--</h3>
+        </div>
+        <div class="w-10 h-10 rounded-lg bg-emerald-500/10 text-emerald-400 flex items-center justify-center text-lg">
+          <i class="fa-solid fa-chair"></i>
+        </div>
+      </div>
+
+      <div class="p-4 rounded-xl bg-slate-800/60 border border-slate-700/60 shadow-sm flex items-center justify-between">
+        <div>
+          <p class="text-xs text-slate-400 uppercase font-medium">Grace Hold (15m)</p>
+          <h3 id="stat-grace" class="text-2xl font-bold text-amber-400 mt-1">--</h3>
+        </div>
+        <div class="w-10 h-10 rounded-lg bg-amber-500/10 text-amber-400 flex items-center justify-center text-lg">
+          <i class="fa-solid fa-clock"></i>
+        </div>
+      </div>
+
+      <div class="p-4 rounded-xl bg-slate-800/60 border border-slate-700/60 shadow-sm flex items-center justify-between">
+        <div>
+          <p class="text-xs text-slate-400 uppercase font-medium">Occupied</p>
+          <h3 id="stat-occupied" class="text-2xl font-bold text-rose-400 mt-1">--</h3>
+        </div>
+        <div class="w-10 h-10 rounded-lg bg-rose-500/10 text-rose-400 flex items-center justify-center text-lg">
+          <i class="fa-solid fa-user-check"></i>
+        </div>
+      </div>
+
+      <div class="p-4 rounded-xl bg-slate-800/60 border border-slate-700/60 shadow-sm flex items-center justify-between">
+        <div>
+          <p class="text-xs text-slate-400 uppercase font-medium">Current Waitlist</p>
+          <h3 id="stat-waitlist" class="text-2xl font-bold text-sky-400 mt-1">3 Students</h3>
+        </div>
+        <div class="w-10 h-10 rounded-lg bg-sky-500/10 text-sky-400 flex items-center justify-center text-lg">
+          <i class="fa-solid fa-list-ol"></i>
+        </div>
+      </div>
+    </section>
+
+    <!-- Student Interface View -->
+    <div id="student-view" class="space-y-6">
+      
+      <!-- Current Active Booking Card (Conditional) -->
+      <div id="active-booking-banner" class="hidden p-5 rounded-2xl bg-gradient-to-r from-blue-900/60 to-slate-900 border border-blue-500/30 flex flex-wrap items-center justify-between gap-4 shadow-lg shadow-blue-950/40">
+        <div class="space-y-1">
+          <div class="flex items-center space-x-2">
+            <span class="text-xs uppercase px-2 py-0.5 rounded font-bold tracking-wider bg-blue-500 text-white" id="booking-badge">RESERVED (UNCONFIRMED)</span>
+            <span class="text-xs text-slate-300">Desk ID: <strong id="current-desk-id" class="text-white text-sm">--</strong></span>
+          </div>
+          <h4 id="booking-title" class="font-bold text-lg text-white">Grace Period Expiring in <span id="grace-timer" class="text-amber-400 font-mono">15:00</span></h4>
+          <p id="booking-desc" class="text-xs text-slate-300">You must scan the desk QR code to confirm arrival or the seat will be auto-released.</p>
+        </div>
+        <div class="flex flex-wrap gap-2">
+          <button onclick="openQRModal()" id="btn-scan-qr" class="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-lg font-semibold text-xs transition flex items-center space-x-1.5">
+            <i class="fa-solid fa-qrcode"></i>
+            <span>Scan Desk QR</span>
+          </button>
+          <button onclick="triggerBreak()" id="btn-short-break" class="hidden px-4 py-2 bg-purple-600 hover:bg-purple-500 text-white rounded-lg font-semibold text-xs transition flex items-center space-x-1.5">
+            <i class="fa-solid fa-mug-hot"></i>
+            <span>Take 15m Break</span>
+          </button>
+          <button onclick="endSession()" class="px-4 py-2 bg-slate-800 hover:bg-rose-900/60 hover:border-rose-500 border border-slate-700 text-slate-300 hover:text-white rounded-lg font-semibold text-xs transition">
+            Release Seat
+          </button>
+        </div>
+      </div>
+
+      <!-- Controls & Filter Toolbar -->
+      <div class="flex flex-wrap items-center justify-between gap-4 p-4 rounded-xl bg-slate-800/40 border border-slate-800">
+        <!-- Floor Selector -->
+        <div class="flex rounded-lg bg-slate-900 p-1 border border-slate-800">
+          <button onclick="changeFloor('Ground')" id="btn-floor-Ground" class="floor-btn px-4 py-1.5 text-xs font-semibold rounded-md bg-blue-600 text-white transition">Ground Floor (Collab)</button>
+          <button onclick="changeFloor('1st')" id="btn-floor-1st" class="floor-btn px-4 py-1.5 text-xs font-semibold rounded-md text-slate-400 hover:text-white transition">1st Floor (Quiet)</button>
+          <button onclick="changeFloor('2nd')" id="btn-floor-2nd" class="floor-btn px-4 py-1.5 text-xs font-semibold rounded-md text-slate-400 hover:text-white transition">2nd Floor (Silent)</button>
+        </div>
+
+        <!-- Filter & Search -->
+        <div class="flex items-center space-x-2 text-xs flex-wrap gap-2">
+          <label class="text-slate-400">Zone:</label>
+          <select id="zone-filter" onchange="renderGrid()" class="bg-slate-900 border border-slate-700 rounded-md px-3 py-1.5 text-slate-200 focus:outline-none focus:border-blue-500">
+            <option value="All">All Zones</option>
+            <option value="Collab">Collaboration</option>
+            <option value="Silent">Silent Reading</option>
+            <option value="Tech">Tech / PC Lab</option>
+          </select>
+
+          <button onclick="openWaitlistModal()" class="px-3 py-1.5 rounded-md bg-slate-800 hover:bg-slate-700 text-sky-400 border border-sky-500/30 transition flex items-center space-x-1.5">
+            <i class="fa-solid fa-bell"></i>
+            <span>Join Waitlist</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- Live Floor Seating Heatmap / Grid -->
+      <div class="p-6 rounded-2xl bg-slate-950 border border-slate-800">
+        <div class="flex justify-between items-center mb-6">
+          <div>
+            <h3 class="text-base font-semibold text-white flex items-center space-x-2">
+              <span id="current-floor-heading">Ground Floor</span>
+              <span class="text-xs px-2 py-0.5 rounded bg-slate-800 text-slate-400 font-normal">Live Heatmap</span>
+            </h3>
+            <p class="text-xs text-slate-500 mt-0.5">Click any available green seat to initiate a 15-minute reservation</p>
+          </div>
+          <!-- Legend -->
+          <div class="flex items-center space-x-3 text-xs text-slate-400">
+            <span class="flex items-center space-x-1"><span class="w-2.5 h-2.5 rounded-full bg-emerald-500 inline-block"></span> <span>Available</span></span>
+            <span class="flex items-center space-x-1"><span class="w-2.5 h-2.5 rounded-full bg-amber-500 inline-block"></span> <span>Grace (15m)</span></span>
+            <span class="flex items-center space-x-1"><span class="w-2.5 h-2.5 rounded-full bg-rose-500 inline-block"></span> <span>Occupied</span></span>
+            <span class="flex items-center space-x-1"><span class="w-2.5 h-2.5 rounded-full bg-purple-500 inline-block"></span> <span>Break</span></span>
+          </div>
+        </div>
+
+        <!-- Seating Layout Grid -->
+        <div id="seats-grid" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4">
+          <!-- Rendered dynamically -->
+        </div>
+      </div>
+    </div>
+
+    <!-- Staff Space Intelligence Analytics View (Hidden by default) -->
+    <div id="staff-view" class="hidden space-y-6">
+      <div class="p-6 rounded-2xl bg-slate-950 border border-slate-800 space-y-6">
+        <div class="flex justify-between items-center border-b border-slate-800 pb-4">
+          <div>
+            <h3 class="text-lg font-bold text-white">Space Intelligence & Peak Usage Analytics</h3>
+            <p class="text-xs text-slate-400">Real-time occupancy trends and auto-release optimization log</p>
+          </div>
+          <span class="text-xs px-3 py-1 bg-blue-500/20 text-blue-400 border border-blue-500/30 rounded-md">Staff View Mode</span>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div class="p-4 rounded-xl bg-slate-900 border border-slate-800">
+            <p class="text-xs text-slate-400">Daily Turnover Rate</p>
+            <h4 class="text-2xl font-bold text-white mt-1">4.8 <span class="text-xs font-normal text-slate-500">students/desk</span></h4>
+            <p class="text-[11px] text-emerald-400 mt-2">↑ 34% vs manual unreserved</p>
+          </div>
+          <div class="p-4 rounded-xl bg-slate-900 border border-slate-800">
+            <p class="text-xs text-slate-400">Phantom Seats Reclaimed</p>
+            <h4 class="text-2xl font-bold text-amber-400 mt-1">19 Today</h4>
+            <p class="text-[11px] text-slate-400 mt-2">Via 15-minute grace auto-release</p>
+          </div>
+          <div class="p-4 rounded-xl bg-slate-900 border border-slate-800">
+            <p class="text-xs text-slate-400">Average Search Time Saved</p>
+            <h4 class="text-2xl font-bold text-blue-400 mt-1">14.2 Mins</h4>
+            <p class="text-[11px] text-emerald-400 mt-2">Reduced roaming congestion</p>
+          </div>
+        </div>
+
+        <!-- Chart Container -->
+        <div class="p-4 rounded-xl bg-slate-900 border border-slate-800">
+          <h4 class="text-xs font-bold text-slate-300 uppercase mb-4">Today's Hourly Library Occupancy Heat Curve</h4>
+          <div class="h-64">
+            <canvas id="occupancyChart"></canvas>
+          </div>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <!-- Desk QR Verification Modal Simulator -->
+  <div id="qr-modal" class="hidden fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+    <div class="bg-slate-900 border border-slate-800 max-w-sm w-full rounded-2xl p-6 text-center space-y-4 shadow-2xl">
+      <div class="flex justify-between items-center">
+        <h4 class="font-bold text-base text-white">Simulate QR Check-In</h4>
+        <button onclick="closeQRModal()" class="text-slate-400 hover:text-white"><i class="fa-solid fa-times"></i></button>
+      </div>
+
+      <div class="relative w-48 h-48 mx-auto bg-slate-950 rounded-xl border-2 border-dashed border-blue-500 flex items-center justify-center overflow-hidden">
+        <i class="fa-solid fa-qrcode text-6xl text-slate-700"></i>
+        <div class="absolute left-0 right-0 h-1 bg-blue-500 scanner-line shadow-lg shadow-blue-500"></div>
+      </div>
+
+      <p class="text-xs text-slate-400">Align your camera with the QR code stuck to desk <strong id="qr-target-desk" class="text-white">--</strong></p>
+
+      <button onclick="confirmQRVerification()" class="w-full py-2.5 bg-blue-600 hover:bg-blue-500 text-white rounded-xl font-semibold text-xs transition shadow-lg shadow-blue-600/30">
+        Simulate Successful Scan
+      </button>
+    </div>
+  </div>
+
+  <!-- Waitlist Modal -->
+  <div id="waitlist-modal" class="hidden fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+    <div class="bg-slate-900 border border-slate-800 max-w-sm w-full rounded-2xl p-6 space-y-4 shadow-2xl">
+      <div class="flex justify-between items-center">
+        <h4 class="font-bold text-base text-white">Join Automated Waitlist</h4>
+        <button onclick="closeWaitlistModal()" class="text-slate-400 hover:text-white"><i class="fa-solid fa-times"></i></button>
+      </div>
+      <p class="text-xs text-slate-400">When any desk on your chosen floor is auto-released or vacated, you'll receive a 5-minute claim notification.</p>
+      
+      <div class="space-y-2 text-xs">
+        <label class="text-slate-300">Preferred Floor</label>
+        <select id="wl-floor" class="w-full bg-slate-950 border border-slate-800 rounded-lg p-2.5 text-slate-200">
+          <option>Ground Floor (Collab)</option>
+          <option>1st Floor (Quiet)</option>
+          <option>2nd Floor (Silent)</option>
+        </select>
+      </div>
+
+      <button onclick="submitWaitlist()" class="w-full py-2.5 bg-sky-600 hover:bg-sky-500 text-white rounded-xl font-semibold text-xs transition">
+        Enter Queue
+      </button>
+    </div>
+  </div>
+
+  <footer class="border-t border-slate-800 bg-slate-950 py-4 text-center text-xs text-slate-500">
+    Designed for Hope Foundation's I²IT Pune • Design Thinking & Innovation Project (IT-EEM-S10)
+  </footer>
+
+  <script>
+    // Initial mock dataset representing library seats
+    const floors = ['Ground', '1st', '2nd'];
+    let currentFloor = 'Ground';
+    let currentSession = null; // { deskId, status: 'grace'|'active'|'break', timeRemaining: 900, intervalId }
+
+    let seats = [
+      { id: 'G-01', floor: 'Ground', zone: 'Collab', status: 'available', hasPlug: true },
+      { id: 'G-02', floor: 'Ground', zone: 'Collab', status: 'occupied', hasPlug: true },
+      { id: 'G-03', floor: 'Ground', zone: 'Collab', status: 'grace', hasPlug: false },
+      { id: 'G-04', floor: 'Ground', zone: 'Collab', status: 'available', hasPlug: true },
+      { id: 'G-05', floor: 'Ground', zone: 'Collab', status: 'break', hasPlug: true },
+      { id: 'G-06', floor: 'Ground', zone: 'Collab', status: 'available', hasPlug: false },
+
+      { id: '1-01', floor: '1st', zone: 'Silent', status: 'available', hasPlug: true },
+      { id: '1-02', floor: '1st', zone: 'Silent', status: 'occupied', hasPlug: true },
+      { id: '1-03', floor: '1st', zone: 'Silent', status: 'available', hasPlug: true },
+      { id: '1-04', floor: '1st', zone: 'Silent', status: 'occupied', hasPlug: false },
+      { id: '1-05', floor: '1st', zone: 'Silent', status: 'available', hasPlug: true },
+      { id: '1-06', floor: '1st', zone: 'Silent', status: 'grace', hasPlug: true },
+
+      { id: '2-01', floor: '2nd', zone: 'Tech', status: 'available', hasPlug: true },
+      { id: '2-02', floor: '2nd', zone: 'Tech', status: 'occupied', hasPlug: true },
+      { id: '2-03', floor: '2nd', zone: 'Tech', status: 'available', hasPlug: true },
+      { id: '2-04', floor: '2nd', zone: 'Tech', status: 'available', hasPlug: true },
+      { id: '2-05', floor: '2nd', zone: 'Tech', status: 'occupied', hasPlug: true },
+      { id: '2-06', floor: '2nd', zone: 'Tech', status: 'break', hasPlug: true },
+    ];
+
+    function updateStats() {
+      const avail = seats.filter(s => s.status === 'available').length;
+      const grace = seats.filter(s => s.status === 'grace').length;
+      const occ = seats.filter(s => s.status === 'occupied' || s.status === 'break').length;
+      document.getElementById('stat-available').innerText = avail;
+      document.getElementById('stat-grace').innerText = grace;
+      document.getElementById('stat-occupied').innerText = occ;
+    }
+
+    function changeFloor(floor) {
+      currentFloor = floor;
+      document.querySelectorAll('.floor-btn').forEach(btn => {
+        btn.classList.remove('bg-blue-600', 'text-white');
+        btn.classList.add('text-slate-400');
+      });
+      const activeBtn = document.getElementById(`btn-floor-${floor}`);
+      activeBtn.classList.add('bg-blue-600', 'text-white');
+      activeBtn.classList.remove('text-slate-400');
+
+      document.getElementById('current-floor-heading').innerText = `${floor} Floor`;
+      renderGrid();
+    }
+
+    function renderGrid() {
+      const grid = document.getElementById('seats-grid');
+      grid.innerHTML = '';
+      const zoneFilter = document.getElementById('zone-filter').value;
+
+      const filteredSeats = seats.filter(s => {
+        return s.floor === currentFloor && (zoneFilter === 'All' || s.zone === zoneFilter);
+      });
+
+      filteredSeats.forEach(seat => {
+        let statusBg = 'bg-slate-900 border-slate-700/80';
+        let badgeColor = 'bg-slate-800 text-slate-300';
+        let actionBtn = '';
+
+        if (seat.status === 'available') {
+          statusBg = 'bg-emerald-950/20 border-emerald-500/40 hover:border-emerald-400 cursor-pointer';
+          badgeColor = 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30';
+          actionBtn = `<button onclick="reserveDesk('${seat.id}')" class="w-full mt-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-semibold text-xs transition">Reserve</button>`;
+        } else if (seat.status === 'grace') {
+          statusBg = 'bg-amber-950/20 border-amber-500/40';
+          badgeColor = 'bg-amber-500/20 text-amber-300 border border-amber-500/30';
+          actionBtn = `<div class="w-full mt-3 py-1.5 text-center text-amber-400 font-mono text-[11px] bg-amber-950/40 rounded-lg">Grace (15m Expiring)</div>`;
+        } else if (seat.status === 'occupied') {
+          statusBg = 'bg-rose-950/20 border-rose-500/30';
+          badgeColor = 'bg-rose-500/20 text-rose-300 border border-rose-500/30';
+          actionBtn = `<div class="w-full mt-3 py-1.5 text-center text-slate-500 font-semibold text-[11px] bg-slate-900 rounded-lg">Occupied</div>`;
+        } else if (seat.status === 'break') {
+          statusBg = 'bg-purple-950/20 border-purple-500/30';
+          badgeColor = 'bg-purple-500/20 text-purple-300 border border-purple-500/30';
+          actionBtn = `<div class="w-full mt-3 py-1.5 text-center text-purple-400 font-semibold text-[11px] bg-purple-950/40 rounded-lg">15m Break</div>`;
+        }
+
+        const card = document.createElement('div');
+        card.className = `p-4 rounded-xl border ${statusBg} flex flex-col justify-between transition-all duration-200`;
+        card.innerHTML = `
+          <div>
+            <div class="flex justify-between items-start">
+              <span class="font-bold text-sm tracking-wide text-white">${seat.id}</span>
+              <span class="text-[10px] uppercase font-bold px-2 py-0.5 rounded-full ${badgeColor}">${seat.status}</span>
+            </div>
+            <p class="text-xs text-slate-400 mt-2 flex items-center space-x-1.5">
+              <i class="fa-solid fa-layer-group text-[10px] text-blue-400"></i>
+              <span>Zone: ${seat.zone}</span>
+            </p>
+            <p class="text-xs text-slate-400 mt-1 flex items-center space-x-1.5">
+              <i class="fa-solid fa-plug text-[10px] ${seat.hasPlug ? 'text-emerald-400' : 'text-slate-600'}"></i>
+              <span>${seat.hasPlug ? 'Power Socket Available' : 'Standard Desk'}</span>
+            </p>
+          </div>
+          <div>${actionBtn}</div>
+        `;
+        grid.appendChild(card);
+      });
+      updateStats();
+    }
+
+    function reserveDesk(deskId) {
+      if (currentSession) {
+        alert("You already have an active reservation for " + currentSession.deskId + ". Please release it first.");
+        return;
+      }
+
+      // Set seat to grace status
+      const seat = seats.find(s => s.id === deskId);
+      if (seat) seat.status = 'grace';
+
+      currentSession = {
+        deskId: deskId,
+        status: 'grace',
+        secondsLeft: 15 * 60, // 15 mins
+        intervalId: null
+      };
+
+      currentSession.intervalId = setInterval(tickSession, 1000);
+      renderSessionBanner();
+      renderGrid();
+    }
+
+    function tickSession() {
+      if (!currentSession) return;
+      currentSession.secondsLeft--;
+
+      if (currentSession.secondsLeft <= 0) {
+        // Auto release logic
+        clearInterval(currentSession.intervalId);
+        const seat = seats.find(s => s.id === currentSession.deskId);
+        if (seat) seat.status = 'available';
+        alert(`Session expired! Desk ${currentSession.deskId} has been auto-released.`);
+        currentSession = null;
+        renderSessionBanner();
+        renderGrid();
+        return;
+      }
+
+      updateTimerDisplay();
+    }
+
+    function updateTimerDisplay() {
+      const minutes = Math.floor(currentSession.secondsLeft / 60);
+      const seconds = currentSession.secondsLeft % 60;
+      const formatted = `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+
+      const timerEl = document.getElementById('grace-timer');
+      if (timerEl) timerEl.innerText = formatted;
+
+      const pillLabel = document.getElementById('session-pill-label');
+      if (pillLabel) {
+        pillLabel.innerText = `${currentSession.status.toUpperCase()}: ${formatted}`;
+      }
+    }
+
+    function renderSessionBanner() {
+      const banner = document.getElementById('active-booking-banner');
+      const pill = document.getElementById('active-session-pill');
+      if (!currentSession) {
+        banner.classList.add('hidden');
+        pill.classList.add('hidden');
+        return;
+      }
+
+      banner.classList.remove('hidden');
+      pill.classList.remove('hidden');
+      document.getElementById('current-desk-id').innerText = currentSession.deskId;
+
+      const badge = document.getElementById('booking-badge');
+      const title = document.getElementById('booking-title');
+      const desc = document.getElementById('booking-desc');
+      const scanBtn = document.getElementById('btn-scan-qr');
+      const breakBtn = document.getElementById('btn-short-break');
+
+      if (currentSession.status === 'grace') {
+        badge.innerText = 'RESERVED (15m GRACE)';
+        badge.className = 'text-xs uppercase px-2 py-0.5 rounded font-bold tracking-wider bg-amber-500 text-slate-950';
+        title.innerHTML = `Grace Check-In Expiring in <span id="grace-timer" class="text-amber-400 font-mono">15:00</span>`;
+        desc.innerText = 'Scan the desk QR code to check in and confirm physical arrival.';
+        scanBtn.classList.remove('hidden');
+        breakBtn.classList.add('hidden');
+      } else if (currentSession.status === 'active') {
+        badge.innerText = 'STUDY SESSION ACTIVE';
+        badge.className = 'text-xs uppercase px-2 py-0.5 rounded font-bold tracking-wider bg-emerald-500 text-white';
+        title.innerHTML = `Active Time Remaining: <span id="grace-timer" class="text-emerald-400 font-mono">--</span>`;
+        desc.innerText = 'You are actively checked in. You may step out for a 15-minute break if needed.';
+        scanBtn.classList.add('hidden');
+        breakBtn.classList.remove('hidden');
+      } else if (currentSession.status === 'break') {
+        badge.innerText = 'SHORT BREAK (15m MAX)';
+        badge.className = 'text-xs uppercase px-2 py-0.5 rounded font-bold tracking-wider bg-purple-500 text-white';
+        title.innerHTML = `Break Expiring in: <span id="grace-timer" class="text-purple-400 font-mono">15:00</span>`;
+        desc.innerText = 'Your desk is reserved for a short break. Return and re-confirm before expiration.';
+        scanBtn.classList.remove('hidden');
+        breakBtn.classList.add('hidden');
+      }
+      updateTimerDisplay();
+    }
+
+    function openQRModal() {
+      if (!currentSession) return;
+      document.getElementById('qr-target-desk').innerText = currentSession.deskId;
+      document.getElementById('qr-modal').classList.remove('hidden');
+    }
+
+    function closeQRModal() {
+      document.getElementById('qr-modal').classList.add('hidden');
+    }
+
+    function confirmQRVerification() {
+      if (!currentSession) return;
+      const seat = seats.find(s => s.id === currentSession.deskId);
+      if (seat) seat.status = 'occupied';
+      
+      currentSession.status = 'active';
+      currentSession.secondsLeft = 120 * 60; // 2 hour study block
+      closeQRModal();
+      renderSessionBanner();
+      renderGrid();
+    }
+
+    function triggerBreak() {
+      if (!currentSession) return;
+      const seat = seats.find(s => s.id === currentSession.deskId);
+      if (seat) seat.status = 'break';
+
+      currentSession.status = 'break';
+      currentSession.secondsLeft = 15 * 60; // 15-minute break
+      renderSessionBanner();
+      renderGrid();
+    }
+
+    function endSession() {
+      if (!currentSession) return;
+      clearInterval(currentSession.intervalId);
+      const seat = seats.find(s => s.id === currentSession.deskId);
+      if (seat) seat.status = 'available';
+      currentSession = null;
+      renderSessionBanner();
+      renderGrid();
+    }
+
+    function toggleAdminView() {
+      const studentView = document.getElementById('student-view');
+      const staffView = document.getElementById('staff-view');
+      const roleText = document.getElementById('role-text');
+
+      if (staffView.classList.contains('hidden')) {
+        staffView.classList.remove('hidden');
+        studentView.classList.add('hidden');
+        roleText.innerText = 'Student Desk View';
+        initChart();
+      } else {
+        staffView.classList.add('hidden');
+        studentView.classList.remove('hidden');
+        roleText.innerText = 'Staff Analytics';
+      }
+    }
+
+    function openWaitlistModal() {
+      document.getElementById('waitlist-modal').classList.remove('hidden');
+    }
+
+    function closeWaitlistModal() {
+      document.getElementById('waitlist-modal').classList.add('hidden');
+    }
+
+    function submitWaitlist() {
+      alert("Successfully added to waitlist queue! You will receive an alert as soon as a seat frees up.");
+      closeWaitlistModal();
+    }
+
+    // Space Analytics Chart
+    let chartInstance = null;
+    function initChart() {
+      if (chartInstance) return;
+      const ctx = document.getElementById('occupancyChart').getContext('2d');
+      chartInstance = new Chart(ctx, {
+        type: 'line',
+        data: {
+          labels: ['8 AM', '10 AM', '12 PM', '2 PM', '4 PM', '6 PM', '8 PM'],
+          datasets: [{
+            label: 'Occupancy Rate (%)',
+            data: [25, 68, 94, 88, 92, 54, 20],
+            borderColor: '#3b82f6',
+            backgroundColor: 'rgba(59, 130, 246, 0.15)',
+            borderWidth: 2,
+            tension: 0.4,
+            fill: true,
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          scales: {
+            y: { beginAtZero: true, max: 100, grid: { color: '#1e293b' } },
+            x: { grid: { color: '#1e293b' } }
+          },
+          plugins: {
+            legend: { display: false }
+          }
+        }
+      });
+    }
+
+    // Init on boot
+    renderGrid();
+  </script>
+</body>
+</html>
